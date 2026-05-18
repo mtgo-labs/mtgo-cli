@@ -53,7 +53,6 @@ var versionCmd = &cobra.Command{
 }
 
 // Stubs — replaced by actual implementations in later tasks
-func newInvokeCmd() *cobra.Command       { return &cobra.Command{Use: "invoke"} }
 func newMethodsCmd() *cobra.Command       { return &cobra.Command{Use: "methods"} }
 func newListenCmd() *cobra.Command        { return &cobra.Command{Use: "listen"} }
 func newTraceCmd() *cobra.Command         { return &cobra.Command{Use: "trace"} }
