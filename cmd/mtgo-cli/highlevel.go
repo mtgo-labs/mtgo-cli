@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mtgo-labs/mtgo-cli/internal/client"
 	"github.com/mtgo-labs/mtgo-cli/internal/config"
@@ -88,8 +89,9 @@ func newSendMessageCmd() *cobra.Command {
 				return fmt.Errorf("resolve peer %q: %w", args[0], err)
 			}
 			peerJSON := peerToJSON(peer)
+			randomID := fmt.Sprintf("%d", time.Now().UnixNano())
 			msgJSON, _ := json.Marshal(args[1])
-			params := []byte(fmt.Sprintf(`{"peer": %s, "message": %s}`, peerJSON, string(msgJSON)))
+			params := []byte(fmt.Sprintf(`{"peer": %s, "message": %s, "random_id": %s}`, peerJSON, string(msgJSON), randomID))
 			result, err := invoke.InvokeFull(ctx, c, "messages.sendMessage", params)
 			if err != nil {
 				return err
@@ -128,7 +130,7 @@ func newGetUserCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve peer: %w", err)
 			}
-			params := peerToJSON(peer)
+			params := userToJSON(peer)
 			result, err := invoke.InvokeFull(ctx, c, "users.getFullUser", []byte(fmt.Sprintf(`{"id": %s}`, params)))
 			if err != nil {
 				return err
@@ -194,7 +196,8 @@ func newListChatsCmd() *cobra.Command {
 			defer c.Stop()
 
 			ctx := context.Background()
-			result, err := invoke.InvokeFull(ctx, c, "messages.getDialogs", []byte(fmt.Sprintf(`{"limit": %d}`, limit)))
+			params := fmt.Sprintf(`{"offset_date": 0, "offset_id": 0, "offset_peer": {"_":"inputPeerEmpty"}, "limit": %d, "hash": 0}`, limit)
+			result, err := invoke.InvokeFull(ctx, c, "messages.getDialogs", []byte(params))
 			if err != nil {
 				return err
 			}
@@ -315,6 +318,17 @@ func newCompletionCmd() *cobra.Command {
 				return fmt.Errorf("unsupported shell: %s (use bash, zsh, or fish)", args[0])
 			}
 		},
+	}
+}
+
+func userToJSON(peer tg.InputPeerClass) string {
+	switch p := peer.(type) {
+	case *tg.InputPeerSelf:
+		return `{"_":"inputUserSelf"}`
+	case *tg.InputPeerUser:
+		return fmt.Sprintf(`{"_":"inputUser","user_id":%d,"access_hash":%d}`, p.UserID, p.AccessHash)
+	default:
+		return `{"_":"inputUserSelf"}`
 	}
 }
 
