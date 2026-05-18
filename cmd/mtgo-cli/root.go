@@ -52,16 +52,4 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-// Stubs — replaced by actual implementations in later tasks
-func newMethodsCmd() *cobra.Command       { return &cobra.Command{Use: "methods"} }
-func newListenCmd() *cobra.Command        { return &cobra.Command{Use: "listen"} }
-func newTraceCmd() *cobra.Command         { return &cobra.Command{Use: "trace"} }
-func newGetMeCmd() *cobra.Command         { return &cobra.Command{Use: "get-me"} }
-func newSendMessageCmd() *cobra.Command   { return &cobra.Command{Use: "send-message"} }
-func newGetUserCmd() *cobra.Command       { return &cobra.Command{Use: "get-user"} }
-func newGetChatCmd() *cobra.Command       { return &cobra.Command{Use: "get-chat"} }
-func newListChatsCmd() *cobra.Command     { return &cobra.Command{Use: "list-chats"} }
-func newListMessagesCmd() *cobra.Command  { return &cobra.Command{Use: "list-messages"} }
-func newResolvePeerCmd() *cobra.Command   { return &cobra.Command{Use: "resolve-peer"} }
-func newExportSessionCmd() *cobra.Command { return &cobra.Command{Use: "export-session"} }
-func newCompletionCmd() *cobra.Command    { return &cobra.Command{Use: "completion"} }
+
