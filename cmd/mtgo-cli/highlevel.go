@@ -12,6 +12,7 @@ import (
 	"github.com/mtgo-labs/mtgo-cli/invoke"
 	"github.com/mtgo-labs/mtgo-cli/ipc"
 	"github.com/mtgo-labs/mtgo/telegram"
+	"github.com/mtgo-labs/mtgo/telegram/types"
 	"github.com/mtgo-labs/mtgo/tg"
 
 	"github.com/spf13/cobra"
@@ -304,6 +305,138 @@ func newCreateGroupCmd() *cobra.Command {
 
 			fmt.Printf("Group %q created\n", args[0])
 			prettyPrint(cfg.Format, result)
+			return nil
+		},
+	}
+}
+
+func newSendPhotoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "send-photo <peer> <file> [caption]",
+		Short: "Send a photo",
+		Args:  cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			peer, err := invoke.ResolvePeer(ctx, c, args[0])
+			if err != nil {
+				return fmt.Errorf("resolve peer: %w", err)
+			}
+
+			caption := ""
+			if len(args) == 3 {
+				caption = args[2]
+			}
+
+			msg, err := c.SendPhoto(ctx, extractChatID(peer), types.Path(args[1]), caption)
+			if err != nil {
+				return fmt.Errorf("send photo: %w", err)
+			}
+			fmt.Printf("Photo sent (ID: %d)\n", msg.ID)
+			return nil
+		},
+	}
+}
+
+func newSendFileCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "send-file <peer> <file> [caption]",
+		Short: "Send a document/file",
+		Args:  cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			peer, err := invoke.ResolvePeer(ctx, c, args[0])
+			if err != nil {
+				return fmt.Errorf("resolve peer: %w", err)
+			}
+
+			caption := ""
+			if len(args) == 3 {
+				caption = args[2]
+			}
+
+			msg, err := c.SendDocument(ctx, extractChatID(peer), types.Path(args[1]), caption)
+			if err != nil {
+				return fmt.Errorf("send file: %w", err)
+			}
+			fmt.Printf("File sent (ID: %d)\n", msg.ID)
+			return nil
+		},
+	}
+}
+
+func newDownloadCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "download <peer> <msg-id> [dest]",
+		Short: "Download media from a message",
+		Args:  cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			var msgID int32
+			fmt.Sscanf(args[1], "%d", &msgID)
+
+			rpc := c.Raw()
+			result, err := rpc.MessagesGetMessages(ctx, &tg.MessagesGetMessagesRequest{
+				ID: []tg.InputMessageClass{
+					&tg.InputMessageID{ID: msgID},
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("get message: %w", err)
+			}
+
+			var media types.Media
+			if msgs, ok := result.(*tg.MessagesMessages); ok {
+				for _, m := range msgs.Messages {
+					if msg, ok2 := m.(*tg.Message); ok2 && msg.ID == msgID {
+						media = types.ParseMedia(msg.Media)
+						break
+					}
+				}
+			}
+			if media == nil {
+				return fmt.Errorf("message %d has no media", msgID)
+			}
+
+			dest := fmt.Sprintf("download_%d", msgID)
+			if len(args) == 3 {
+				dest = args[2]
+			}
+
+			err = c.DownloadMediaToFile(ctx, media, "", dest, 0, nil)
+			if err != nil {
+				return fmt.Errorf("download: %w", err)
+			}
+			fmt.Printf("Downloaded to %s\n", dest)
 			return nil
 		},
 	}
