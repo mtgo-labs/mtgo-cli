@@ -41,6 +41,18 @@ func FilterMethods(prefix string) []string {
 	return result
 }
 
+var blockedMethods = map[string]bool{
+	"auth.logOut":              true,
+	"auth.resetAuthorizations": true,
+	"account.deleteAccount":    true,
+	"account.setPrivacy":       true,
+	"account.resetPassword":    true,
+}
+
+func IsMethodBlocked(name string) bool {
+	return blockedMethods[name]
+}
+
 func MethodExists(name string) bool {
 	id, ok := tg.NamesMap[name]
 	if !ok {

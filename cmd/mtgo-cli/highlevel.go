@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/mtgo-labs/mtgo-cli/invoke"
 	"github.com/mtgo-labs/mtgo-cli/ipc"
 	"github.com/mtgo-labs/mtgo/telegram"
+	"github.com/mtgo-labs/mtgo/telegram/params"
 	"github.com/mtgo-labs/mtgo/telegram/types"
 	"github.com/mtgo-labs/mtgo/tg"
 
@@ -50,7 +52,7 @@ func newGetMeCmd() *cobra.Command {
 				ipcClient := ipc.NewClient(cfg.SocketPath)
 				resp, _ := ipcClient.Status()
 				if resp != nil && resp.OK {
-					prettyPrint(cfg.Format, resp.Data)
+					prettyPrint(cmd.OutOrStdout(), cfg.Format, resp.Data)
 					return nil
 				}
 			}
@@ -63,7 +65,7 @@ func newGetMeCmd() *cobra.Command {
 			if me == nil {
 				return fmt.Errorf("could not get current user info")
 			}
-			prettyPrint(cfg.Format, me)
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, me)
 			return nil
 		},
 	}
@@ -101,9 +103,9 @@ func newSendMessageCmd() *cobra.Command {
 				return fmt.Errorf("send message: %w", err)
 			}
 			if cfg.Format == "json" {
-				prettyPrint(cfg.Format, result)
+				prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			} else {
-				fmt.Println("Message sent")
+				fmt.Fprintln(cmd.OutOrStdout(), "Message sent")
 			}
 			return nil
 		},
@@ -139,7 +141,7 @@ func newGetUserCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("get user: %w", err)
 			}
-			prettyPrint(cfg.Format, result)
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			return nil
 		},
 	}
@@ -191,7 +193,7 @@ func newGetChatCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("get info: %w", err)
 			}
-			prettyPrint(cfg.Format, result)
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			return nil
 		},
 	}
@@ -225,7 +227,7 @@ func newListChatsCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("get dialogs: %w", err)
 			}
-			prettyPrint(cfg.Format, result)
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			return nil
 		},
 	}
@@ -257,19 +259,19 @@ func newListMessagesCmd() *cobra.Command {
 			}
 			rpc := c.Raw()
 			result, err := rpc.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
-				Peer:      peer,
-				Limit:     int32(limit),
-				OffsetID:  0,
+				Peer:       peer,
+				Limit:      int32(limit),
+				OffsetID:   0,
 				OffsetDate: 0,
-				AddOffset: 0,
-				MaxID:     0,
-				MinID:     0,
-				Hash:      0,
+				AddOffset:  0,
+				MaxID:      0,
+				MinID:      0,
+				Hash:       0,
 			})
 			if err != nil {
 				return fmt.Errorf("get history: %w", err)
 			}
-			prettyPrint(cfg.Format, result)
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			return nil
 		},
 	}
@@ -304,8 +306,8 @@ func newCreateGroupCmd() *cobra.Command {
 				return fmt.Errorf("create chat: %w", err)
 			}
 
-			fmt.Printf("Group %q created\n", args[0])
-			prettyPrint(cfg.Format, result)
+			fmt.Fprintf(cmd.OutOrStdout(), "Group %q created\n", args[0])
+			prettyPrint(cmd.OutOrStdout(), cfg.Format, result)
 			return nil
 		},
 	}
@@ -317,6 +319,9 @@ func newSendPhotoCmd() *cobra.Command {
 		Short: "Send a photo",
 		Args:  cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateUploadFile(args[1]); err != nil {
+				return err
+			}
 			cfg, err := config.Load(cmd)
 			if err != nil {
 				return err
@@ -342,7 +347,7 @@ func newSendPhotoCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("send photo: %w", err)
 			}
-			fmt.Printf("Photo sent (ID: %d)\n", msg.ID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Photo sent (ID: %d)\n", msg.ID)
 			return nil
 		},
 	}
@@ -354,6 +359,9 @@ func newSendFileCmd() *cobra.Command {
 		Short: "Send a document/file",
 		Args:  cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateUploadFile(args[1]); err != nil {
+				return err
+			}
 			cfg, err := config.Load(cmd)
 			if err != nil {
 				return err
@@ -379,10 +387,21 @@ func newSendFileCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("send file: %w", err)
 			}
-			fmt.Printf("File sent (ID: %d)\n", msg.ID)
+			fmt.Fprintf(cmd.OutOrStdout(), "File sent (ID: %d)\n", msg.ID)
 			return nil
 		},
 	}
+}
+
+func validateUploadFile(path string) error {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", path, err)
+	}
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s: not a regular file (mode %s)", path, fi.Mode())
+	}
+	return nil
 }
 
 func newDownloadCmd() *cobra.Command {
@@ -402,29 +421,20 @@ func newDownloadCmd() *cobra.Command {
 			defer c.Stop()
 
 			ctx := context.Background()
-			var msgID int32
-			fmt.Sscanf(args[1], "%d", &msgID)
+			peer, err := invoke.ResolvePeer(ctx, c, args[0])
+			if err != nil {
+				return fmt.Errorf("resolve peer: %w", err)
+			}
+			msgID, err := parseMessageID(args[1])
+			if err != nil {
+				return err
+			}
 
-			rpc := c.Raw()
-			result, err := rpc.MessagesGetMessages(ctx, &tg.MessagesGetMessagesRequest{
-				ID: []tg.InputMessageClass{
-					&tg.InputMessageID{ID: msgID},
-				},
-			})
+			msgs, err := c.GetMessages(ctx, extractChatID(peer), []int32{msgID})
 			if err != nil {
 				return fmt.Errorf("get message: %w", err)
 			}
-
-			var media types.Media
-			if msgs, ok := result.(*tg.MessagesMessages); ok {
-				for _, m := range msgs.Messages {
-					if msg, ok2 := m.(*tg.Message); ok2 && msg.ID == msgID {
-						media = types.ParseMedia(msg.Media)
-						break
-					}
-				}
-			}
-			if media == nil {
+			if len(msgs) == 0 || msgs[0].Media == nil {
 				return fmt.Errorf("message %d has no media", msgID)
 			}
 
@@ -433,14 +443,31 @@ func newDownloadCmd() *cobra.Command {
 				dest = args[2]
 			}
 
-			err = c.DownloadMediaToFile(ctx, media, "", dest, 0, nil)
+			if fi, err := os.Lstat(dest); err == nil {
+				if fi.Mode()&os.ModeSymlink != 0 {
+					return fmt.Errorf("refusing to write to symlink %s", dest)
+				}
+				if fi.IsDir() {
+					return fmt.Errorf("destination %s is a directory", dest)
+				}
+			}
+
+			err = c.DownloadMediaToFile(ctx, msgs[0].Media, "", dest, 0, &params.Download{DCID: 0})
 			if err != nil {
 				return fmt.Errorf("download: %w", err)
 			}
-			fmt.Printf("Downloaded to %s\n", dest)
+			fmt.Fprintf(cmd.OutOrStdout(), "Downloaded to %s\n", dest)
 			return nil
 		},
 	}
+}
+
+func parseMessageID(s string) (int32, error) {
+	id, err := strconv.ParseInt(s, 10, 32)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("invalid message id %q", s)
+	}
+	return int32(id), nil
 }
 
 func newAddBotCmd() *cobra.Command {
@@ -463,7 +490,6 @@ func newAddBotCmd() *cobra.Command {
 			var groupPeer tg.InputPeerClass
 			var chatID int64
 
-			// Check if raw chat ID was given
 			if rawID, parseErr := strconv.ParseInt(args[0], 10, 64); parseErr == nil {
 				chatID = rawID
 			} else {
@@ -506,7 +532,7 @@ func newAddBotCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("add bot: %w", err)
 			}
-			fmt.Println("Bot added to group")
+			fmt.Fprintln(cmd.OutOrStdout(), "Bot added to group")
 			return nil
 		},
 	}
@@ -563,7 +589,7 @@ func newPromoteBotCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("promote bot: %w", err)
 			}
-			fmt.Println("Bot promoted to admin")
+			fmt.Fprintln(cmd.OutOrStdout(), "Bot promoted to admin")
 			return nil
 		},
 	}
@@ -589,16 +615,21 @@ func newResolvePeerCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve: %w", err)
 			}
-			fmt.Printf("Resolved %q -> %s\n", args[0], invoke.PeerString(peer))
+			fmt.Fprintf(cmd.OutOrStdout(), "Resolved %q -> %s\n", args[0], invoke.PeerString(peer))
 			return nil
 		},
 	}
 }
 
 func newExportSessionCmd() *cobra.Command {
-	return &cobra.Command{
+	var outputFile string
+	cmd := &cobra.Command{
 		Use:   "export-session",
 		Short: "Export the current session as a string",
+		Long: `Export the session string for the current Telegram account.
+
+WARNING: The session string grants full account access. Anyone who obtains
+it can impersonate your account. Handle with extreme care.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(cmd)
 			if err != nil {
@@ -614,10 +645,22 @@ func newExportSessionCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("export session: %w", err)
 			}
-			fmt.Println(sessionStr)
+
+			if outputFile != "" {
+				if err := os.WriteFile(outputFile, []byte(sessionStr+"\n"), 0600); err != nil {
+					return fmt.Errorf("write session file: %w", err)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Session written to %s (mode 0600)\n", outputFile)
+				return nil
+			}
+
+			fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: session string grants full account access. Pipe to a file or use --output.")
+			fmt.Fprintln(cmd.OutOrStdout(), sessionStr)
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&outputFile, "output", "", "Write session to file (mode 0600) instead of stdout")
+	return cmd
 }
 
 func newCompletionCmd() *cobra.Command {
@@ -626,13 +669,14 @@ func newCompletionCmd() *cobra.Command {
 		Short: "Generate shell completions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			w := cmd.OutOrStdout()
 			switch args[0] {
 			case "bash":
-				return rootCmd.GenBashCompletion(os.Stdout)
+				return rootCmd.GenBashCompletion(w)
 			case "zsh":
-				return rootCmd.GenZshCompletion(os.Stdout)
+				return rootCmd.GenZshCompletion(w)
 			case "fish":
-				return rootCmd.GenFishCompletion(os.Stdout, true)
+				return rootCmd.GenFishCompletion(w, true)
 			default:
 				return fmt.Errorf("unsupported shell: %s (use bash, zsh, or fish)", args[0])
 			}
@@ -677,6 +721,8 @@ func peerToJSON(peer tg.InputPeerClass) string {
 
 func extractChatID(peer tg.InputPeerClass) int64 {
 	switch p := peer.(type) {
+	case *tg.InputPeerUser:
+		return p.UserID
 	case *tg.InputPeerChat:
 		return p.ChatID
 	case *tg.InputPeerChannel:
@@ -686,11 +732,11 @@ func extractChatID(peer tg.InputPeerClass) int64 {
 	}
 }
 
-func prettyPrint(format string, data interface{}) {
+func prettyPrint(w io.Writer, format string, data interface{}) {
 	if format == "json" {
 		out, _ := json.MarshalIndent(data, "", "  ")
-		fmt.Println(string(out))
+		fmt.Fprintln(w, string(out))
 		return
 	}
-	fmt.Printf("%+v\n", data)
+	fmt.Fprintf(w, "%+v\n", data)
 }

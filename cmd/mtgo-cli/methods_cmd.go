@@ -20,27 +20,25 @@ func newMethodsCmd() *cobra.Command {
 				prefix = args[0]
 			}
 
-			cfg, err := config.Load(cmd)
-			if err != nil {
-				_ = cfg
-			}
+			cfg, _ := config.Load(cmd)
+			w := cmd.OutOrStdout()
 
 			methods := invoke.FilterMethods(prefix)
 
 			if cfg != nil && cfg.Format == "json" {
 				out, _ := json.MarshalIndent(methods, "", "  ")
-				fmt.Println(string(out))
+				fmt.Fprintln(w, string(out))
 				return nil
 			}
 
 			for _, m := range methods {
-				fmt.Println(m)
+				fmt.Fprintln(w, m)
 			}
-			fmt.Printf("\n%d methods", len(methods))
+			fmt.Fprintf(w, "\n%d methods", len(methods))
 			if prefix != "" {
-				fmt.Printf(" matching '%s'", prefix)
+				fmt.Fprintf(w, " matching '%s'", prefix)
 			}
-			fmt.Println()
+			fmt.Fprintln(w)
 			return nil
 		},
 	}

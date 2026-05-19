@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mtgo-labs/mtgo-cli/internal/client"
 	"github.com/mtgo-labs/mtgo-cli/internal/config"
@@ -21,10 +22,22 @@ type invokeHandler struct {
 }
 
 func (h *invokeHandler) HandleInvoke(payload ipc.InvokePayload) (*ipc.Response, error) {
-	ctx := context.Background()
-	result, err := invoke.InvokeFull(ctx, h.client, payload.TLMethod, payload.JSONParams)
+	if invoke.IsMethodBlocked(payload.TLMethod) {
+		return &ipc.Response{OK: false, Error: "method not allowed via IPC"}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var result *invoke.Result
+	var err error
+	if payload.Fast {
+		result, err = invoke.InvokeFast(ctx, h.client, payload.TLMethod, payload.JSONParams)
+	} else {
+		result, err = invoke.InvokeFull(ctx, h.client, payload.TLMethod, payload.JSONParams)
+	}
 	if err != nil {
-		return &ipc.Response{OK: false, Error: err.Error()}, nil
+		return &ipc.Response{OK: false, Error: "internal error"}, nil
 	}
 	if result.Error != "" {
 		return &ipc.Response{OK: false, Error: result.Error, DurMs: result.Duration.Milliseconds()}, nil
@@ -33,15 +46,7 @@ func (h *invokeHandler) HandleInvoke(payload ipc.InvokePayload) (*ipc.Response, 
 }
 
 func (h *invokeHandler) HandleStatus() *ipc.Response {
-	me := h.client.Me()
-	data := map[string]interface{}{
-		"connected": true,
-	}
-	if me != nil {
-		data["user_id"] = me.ID
-		data["first_name"] = me.FirstName
-	}
-	return &ipc.Response{OK: true, Data: data}
+	return &ipc.Response{OK: true, Data: map[string]bool{"connected": h.client.Me() != nil}}
 }
 
 func newListenCmd() *cobra.Command {
@@ -57,6 +62,10 @@ automatically route through the IPC socket.`,
 			if err != nil {
 				return err
 			}
+
+			shutdown := make(chan os.Signal, 1)
+			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+			defer signal.Stop(shutdown)
 
 			mtgoClient, err := client.New(&client.ClientConfig{
 				APIID:       cfg.APIID,
@@ -75,11 +84,13 @@ automatically route through the IPC socket.`,
 			}
 			defer mtgoClient.Stop()
 
+			w := cmd.OutOrStdout()
+
 			me := mtgoClient.Me()
 			if me != nil {
-				fmt.Printf("Connected as %s (ID: %d)\n", me.FirstName, me.ID)
+				fmt.Fprintf(w, "Connected (ID: %d)\n", me.ID)
 			} else {
-				fmt.Println("Connected (anonymous)")
+				fmt.Fprintln(w, "Connected (anonymous)")
 			}
 
 			handler := &invokeHandler{client: mtgoClient}
@@ -89,13 +100,10 @@ automatically route through the IPC socket.`,
 			}
 			defer srv.Stop()
 
-			fmt.Printf("IPC server listening on %s\n", cfg.SocketPath)
-
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+			fmt.Fprintf(w, "IPC server listening on %s\n", cfg.SocketPath)
 
 			<-shutdown
-			fmt.Println("\nShutting down...")
+			fmt.Fprintln(w, "\nShutting down...")
 			return nil
 		},
 	}

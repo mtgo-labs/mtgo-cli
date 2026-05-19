@@ -45,9 +45,13 @@ func (c *Client) Send(req Request) (*Response, error) {
 }
 
 func (c *Client) Invoke(payload InvokePayload) (*Response, error) {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("ipc marshal payload: %w", err)
+	}
 	return c.Send(Request{
 		Method:  "invoke",
-		Payload: payload,
+		Payload: raw,
 	})
 }
 

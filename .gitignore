@@ -1,1 +1,6 @@
 /mtgo-cli
+.mtgo-cli.json
+*.session
+.env
+.env.*
+download_*

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/mtgo-labs/mtgo-cli/internal/client"
 	"github.com/mtgo-labs/mtgo-cli/internal/config"
@@ -16,8 +16,7 @@ import (
 
 func newInvokeCmd() *cobra.Command {
 	var fast bool
-	var timeout int
-	var retries int
+	var maxBytes int
 
 	cmd := &cobra.Command{
 		Use:   "invoke <method> [json-params]",
@@ -46,7 +45,6 @@ Otherwise it creates a standalone connection.`,
 
 			ctx := context.Background()
 
-			// Try IPC first
 			if ipc.IsSocketActive(cfg.SocketPath) {
 				ipcClient := ipc.NewClient(cfg.SocketPath)
 				resp, err := ipcClient.Invoke(ipc.InvokePayload{
@@ -55,15 +53,13 @@ Otherwise it creates a standalone connection.`,
 					Fast:       fast,
 				})
 				if err == nil && resp.OK {
-					return formatOutput(cfg.Format, resp.Data)
+					return formatOutput(cmd.OutOrStdout(), cfg.Format, resp.Data)
 				}
 				if err == nil && !resp.OK {
 					return fmt.Errorf("invoke failed: %s", resp.Error)
 				}
-				// IPC failed, fall through to standalone
 			}
 
-			// Standalone mode
 			mtgoClient, err := client.New(&client.ClientConfig{
 				APIID:     cfg.APIID,
 				APIHash:   cfg.APIHash,
@@ -94,19 +90,17 @@ Otherwise it creates a standalone connection.`,
 				return fmt.Errorf("RPC error: %s", result.Error)
 			}
 
-			formatInvokeResult(cfg.Format, result)
+			formatInvokeResult(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg.Format, result, maxBytes)
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVar(&fast, "fast", false, "Use fast path (skip TL decode)")
-	cmd.Flags().IntVar(&timeout, "timeout", 60, "Per-request timeout in seconds")
-	cmd.Flags().IntVar(&retries, "retries", 3, "Retry count on transient errors")
-
+	cmd.Flags().IntVar(&maxBytes, "max-bytes", 256, "Max raw bytes to display (0 = unlimited)")
 	return cmd
 }
 
-func formatOutput(format string, data interface{}) error {
+func formatOutput(w io.Writer, format string, data interface{}) error {
 	if data == nil {
 		return nil
 	}
@@ -114,28 +108,37 @@ func formatOutput(format string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(out))
+	fmt.Fprintln(w, string(out))
 	return nil
 }
 
-func formatInvokeResult(format string, result *invoke.Result) {
+func formatInvokeResult(w io.Writer, errW io.Writer, format string, result *invoke.Result, maxBytes int) {
 	if result.Error != "" {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error)
+		fmt.Fprintf(errW, "Error: %s\n", result.Error)
 		return
 	}
 	if format == "json" && result.RawJSON != nil {
 		var pretty bytes.Buffer
 		json.Indent(&pretty, result.RawJSON, "", "  ")
-		fmt.Println(pretty.String())
+		fmt.Fprintln(w, pretty.String())
 		return
 	}
 	if result.RawBytes != nil {
-		fmt.Printf("%x\n", result.RawBytes)
+		raw := result.RawBytes
+		truncated := false
+		if maxBytes > 0 && len(raw) > maxBytes {
+			raw = raw[:maxBytes]
+			truncated = true
+		}
+		fmt.Fprintf(w, "%x\n", raw)
+		if truncated {
+			fmt.Fprintf(w, "... (%d bytes truncated, use --max-bytes=0 for full output)\n", len(result.RawBytes)-maxBytes)
+		}
 		return
 	}
 	if result.Data != nil {
 		out, _ := json.MarshalIndent(result.Data, "", "  ")
-		fmt.Println(string(out))
+		fmt.Fprintln(w, string(out))
 		return
 	}
 }

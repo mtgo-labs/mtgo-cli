@@ -13,6 +13,7 @@ mtgo-cli is a CLI tool for calling the Telegram MTProto API directly from the te
 **Repo:** `github.com/mtgo-labs/mtgo-cli`
 **Env vars:** `MTGO_CLI_API_ID`, `MTGO_CLI_API_HASH`, `MTGO_CLI_BOT_TOKEN`, `MTGO_CLI_SESSION`, `MTGO_CLI_PHONE`
 **Config file:** `~/.mtgo-cli.json` (JSON with `api_id`, `api_hash`, `bot_token`, etc.)
+**Related skill:** For mtgo library APIs, client patterns, and raw TL usage, install the mtgo skill with `npx skills add https://github.com/mtgo-labs/mtgo`.
 
 ## Authentication
 
@@ -25,6 +26,20 @@ export MTGO_CLI_BOT_TOKEN=123:ABC   # or MTGO_CLI_SESSION or MTGO_CLI_PHONE
 ```
 
 The priority order is: env vars > CLI flags > config file. Choose ONE auth method — bot token, phone, or session string. If you have a session string from Telethon/Pyrogram/GramJS/mtcute, use `MTGO_CLI_SESSION` — it auto-detects the format.
+
+### Userbot testing and BotFather setup
+
+For normal bot-auth API checks, a bot token is enough. Do not require a userbot by default.
+
+When the task involves testing a bot as a real user, creating groups, adding/promoting bots, clicking inline buttons, or creating a new bot through BotFather, ask the user whether they want to set up a userbot test account and/or create a bot via BotFather.
+
+If they choose userbot testing, request:
+
+- `api_id` and `api_hash` from https://my.telegram.org
+- a real user session string via `MTGO_CLI_SESSION`, or a phone login via `MTGO_CLI_PHONE`
+- the bot username to test, or permission to create one via BotFather
+
+Bot sessions cannot create groups, add members, promote admins, or act as a real user in bot interaction tests. Use `MTGO_CLI_BOT_TOKEN` for bot-auth commands and user sessions for user-account operations.
 
 For the fastest repeated usage, start a persistent listener that reuses one connection:
 
@@ -63,7 +78,7 @@ mtgo-cli invoke help.getConfig --fast
 mtgo-cli invoke users.getFullUser '{"id":{"_":"inputUserSelf"}}' --format json
 ```
 
-**Discovering constructor names and parameters:** Use `mtgo-cli methods <prefix>` to find TL method names, then check the Telegram API docs at https://corefork.telegram.org/methods for the expected parameters and constructors.
+**Discovering constructor names and parameters:** Use `mtgo-cli methods <prefix>` to find TL method names, then check https://corefork.telegram.org/methods for method parameters, return types, and known errors. Use https://corefork.telegram.org/schema for raw TL constructors and interface types.
 
 ### Methods — discover TL methods
 

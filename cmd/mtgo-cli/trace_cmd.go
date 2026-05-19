@@ -30,6 +30,10 @@ Output format:
 				return err
 			}
 
+			shutdown := make(chan os.Signal, 1)
+			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+			defer signal.Stop(shutdown)
+
 			mtgoClient, err := client.New(&client.ClientConfig{
 				APIID:       cfg.APIID,
 				APIHash:     cfg.APIHash,
@@ -47,9 +51,11 @@ Output format:
 			}
 			defer mtgoClient.Stop()
 
+			w := cmd.OutOrStdout()
+
 			me := mtgoClient.Me()
 			if me != nil {
-				fmt.Printf("Connected as %s (ID: %d)\n", me.FirstName, me.ID)
+				fmt.Fprintf(w, "Connected (ID: %d)\n", me.ID)
 			}
 
 			tr := trace.NewTracer(os.Stdout)
@@ -63,12 +69,10 @@ Output format:
 			}
 			defer srv.Stop()
 
-			fmt.Printf("Tracing started (socket: %s)\n", cfg.SocketPath)
+			fmt.Fprintf(w, "Tracing started (socket: %s)\n", cfg.SocketPath)
 
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 			<-shutdown
-			fmt.Println("\nShutting down...")
+			fmt.Fprintln(w, "\nShutting down...")
 			return nil
 		},
 	}

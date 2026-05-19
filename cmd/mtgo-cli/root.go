@@ -18,9 +18,12 @@ Built on mtgo (MTProto Go).`,
 
 func init() {
 	rootCmd.PersistentFlags().Int32("api-id", 0, "Telegram API ID")
-	rootCmd.PersistentFlags().String("api-hash", "", "Telegram API Hash")
-	rootCmd.PersistentFlags().String("session", "", "Session string (auto-detects format)")
-	rootCmd.PersistentFlags().String("bot-token", "", "Bot token")
+	rootCmd.PersistentFlags().String("api-hash", "", "Telegram API Hash (prefer --api-hash-file)")
+	rootCmd.PersistentFlags().String("api-hash-file", "", "Read Telegram API Hash from file")
+	rootCmd.PersistentFlags().String("session", "", "Session string (prefer --session-file)")
+	rootCmd.PersistentFlags().String("session-file", "", "Read session string from file")
+	rootCmd.PersistentFlags().String("bot-token", "", "Bot token (prefer --bot-token-file)")
+	rootCmd.PersistentFlags().String("bot-token-file", "", "Read bot token from file")
 	rootCmd.PersistentFlags().String("phone", "", "Phone number for user login")
 	rootCmd.PersistentFlags().String("socket", "", "Unix socket path for IPC")
 	rootCmd.PersistentFlags().String("config", "", "Config file path (default: ~/.mtgo-cli.json)")
@@ -53,8 +56,9 @@ func init() {
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("mtgo-cli %s (commit %s, built %s)\n", version, commit, buildTime)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintf(cmd.OutOrStdout(), "mtgo-cli %s (commit %s, built %s)\n", version, commit, buildTime)
+		return nil
 	},
 }
 

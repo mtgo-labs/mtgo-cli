@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,8 +16,28 @@ import (
 
 var idSeq int64
 
+var sensitivePrefixes = []string{
+	"auth.",
+	"account.updatePassword",
+	"account.getPassword",
+	"account.resetPassword",
+	"account.sendConfirmPhone",
+	"messages.requestWebView",
+	"messages.prolongWebView",
+}
+
+func isSensitive(name string) bool {
+	for _, p := range sensitivePrefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
 type Tracer struct {
 	out io.Writer
+	mu  sync.Mutex
 }
 
 func NewTracer(out io.Writer) *Tracer {
@@ -26,7 +48,9 @@ func NewTracer(out io.Writer) *Tracer {
 }
 
 func (t *Tracer) Tracef(id int64, format string, args ...any) {
+	t.mu.Lock()
 	fmt.Fprintf(t.out, "[%d] %s\n", id, fmt.Sprintf(format, args...))
+	t.mu.Unlock()
 }
 
 func (t *Tracer) NextID() int64 {
@@ -38,18 +62,25 @@ func (t *Tracer) Middleware() telegram.InvokerMiddleware {
 		return tg.InvokerFunc(func(ctx context.Context, input tg.TLObject, decode func(*tg.Reader) (tg.TLObject, error)) (tg.TLObject, error) {
 			id := t.NextID()
 			name := tgName(input)
-			t.Tracef(id, ">> %s", name)
-			t.Tracef(id, "   %v", input)
+
+			if isSensitive(name) {
+				t.Tracef(id, ">> %s [REDACTED]", name)
+			} else {
+				t.Tracef(id, ">> %s", name)
+				t.Tracef(id, "   %v", input)
+			}
 
 			start := time.Now()
 			result, err := next.RPCInvoke(ctx, input, decode)
 			elapsed := time.Since(start)
 
 			if err != nil {
-				t.Tracef(id, "<< %s [ERROR: %v] [%s]", name, err, elapsed.Round(time.Millisecond))
+				t.Tracef(id, "<< %s [ERROR] [%s]", name, elapsed.Round(time.Millisecond))
 			} else {
 				t.Tracef(id, "<< %s [%s]", name, elapsed.Round(time.Millisecond))
-				t.Tracef(id, "   %v", result)
+				if !isSensitive(name) {
+					t.Tracef(id, "   %v", result)
+				}
 			}
 			return result, err
 		})
