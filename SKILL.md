@@ -207,6 +207,7 @@ Use `--format json` for programmatic output. Default is colored text. Use `--no-
 2. **Use `--fast`** for bulk operations — skips full TL decode on responses, returns raw bytes.
 3. **Use `--format json`** — parse with `jq` rather than parsing colored text output.
 4. **Resolve peers once** — use `resolve-peer` to get the access hash, then use numeric IDs in subsequent calls.
+5. **Bypass JSON for precision** — `invoke` routes through JSON which can lose precision on large int64 values (e.g., access_hash). Commands `send-message`, `get-user`, and `get-chat` bypass this by using the Go API directly. For raw `invoke` calls with access_hash, prefer the `--fast` flag or verify the value is exact.
 
 ## Error Handling
 
