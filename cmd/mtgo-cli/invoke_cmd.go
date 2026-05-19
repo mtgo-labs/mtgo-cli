@@ -124,23 +124,18 @@ func formatInvokeResult(format string, result *invoke.Result) {
 		return
 	}
 	if format == "json" && result.RawJSON != nil {
-		// Preserve int64 precision by using raw JSON bytes
 		var pretty bytes.Buffer
 		json.Indent(&pretty, result.RawJSON, "", "  ")
 		fmt.Println(pretty.String())
 		return
 	}
-	if format == "json" && result.Data != nil {
-		out, _ := json.MarshalIndent(result.Data, "", "  ")
-		fmt.Println(string(out))
+	if result.RawBytes != nil {
+		fmt.Printf("%x\n", result.RawBytes)
 		return
 	}
 	if result.Data != nil {
 		out, _ := json.MarshalIndent(result.Data, "", "  ")
 		fmt.Println(string(out))
 		return
-	}
-	if result.RawJSON != nil {
-		fmt.Println(string(result.RawJSON))
 	}
 }

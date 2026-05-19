@@ -26,6 +26,14 @@ func ResolvePeer(ctx context.Context, client *telegram.Client, peerStr string) (
 		return client.ResolvePeer(ctx, id)
 	}
 
+	if idStr, ok := strings.CutPrefix(peerStr, "chat:"); ok {
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid chat ID: %q", idStr)
+		}
+		return client.ResolvePeer(ctx, id)
+	}
+
 	if idStr, ok := strings.CutPrefix(peerStr, "user:"); ok {
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {

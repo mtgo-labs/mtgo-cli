@@ -43,6 +43,8 @@ func init() {
 	rootCmd.AddCommand(newListChatsCmd())
 	rootCmd.AddCommand(newListMessagesCmd())
 	rootCmd.AddCommand(newCreateGroupCmd())
+	rootCmd.AddCommand(newAddBotCmd())
+	rootCmd.AddCommand(newPromoteBotCmd())
 	rootCmd.AddCommand(newResolvePeerCmd())
 	rootCmd.AddCommand(newExportSessionCmd())
 	rootCmd.AddCommand(newCompletionCmd())

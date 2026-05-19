@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/mtgo-labs/mtgo-cli/internal/client"
@@ -437,6 +438,132 @@ func newDownloadCmd() *cobra.Command {
 				return fmt.Errorf("download: %w", err)
 			}
 			fmt.Printf("Downloaded to %s\n", dest)
+			return nil
+		},
+	}
+}
+
+func newAddBotCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add-bot <group-peer> <bot-peer>",
+		Short: "Add a bot to a group (userbot only)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			var groupPeer tg.InputPeerClass
+			var chatID int64
+
+			// Check if raw chat ID was given
+			if rawID, parseErr := strconv.ParseInt(args[0], 10, 64); parseErr == nil {
+				chatID = rawID
+			} else {
+				groupPeer, err = invoke.ResolvePeer(ctx, c, args[0])
+				if err != nil {
+					return fmt.Errorf("resolve group: %w", err)
+				}
+			}
+
+			botPeer, err := invoke.ResolvePeer(ctx, c, args[1])
+			if err != nil {
+				return fmt.Errorf("resolve bot: %w", err)
+			}
+			botUser := peerToInputUser(botPeer)
+			rpc := c.Raw()
+
+			if chatID != 0 {
+				_, err = rpc.MessagesAddChatUser(ctx, &tg.MessagesAddChatUserRequest{
+					ChatID:   chatID,
+					UserID:   botUser,
+					FwdLimit: 100,
+				})
+			} else {
+				switch gp := groupPeer.(type) {
+				case *tg.InputPeerChannel:
+					_, err = rpc.ChannelsInviteToChannel(ctx, &tg.ChannelsInviteToChannelRequest{
+						Channel: &tg.InputChannel{ChannelID: gp.ChannelID, AccessHash: gp.AccessHash},
+						Users:   []tg.InputUserClass{botUser},
+					})
+				case *tg.InputPeerChat:
+					_, err = rpc.MessagesAddChatUser(ctx, &tg.MessagesAddChatUserRequest{
+						ChatID:   gp.ChatID,
+						UserID:   botUser,
+						FwdLimit: 100,
+					})
+				default:
+					return fmt.Errorf("group peer must be a chat or channel, got %T", groupPeer)
+				}
+			}
+			if err != nil {
+				return fmt.Errorf("add bot: %w", err)
+			}
+			fmt.Println("Bot added to group")
+			return nil
+		},
+	}
+}
+
+func newPromoteBotCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "promote-bot <channel-peer> <bot-peer>",
+		Short: "Promote a bot to admin in a channel (userbot only)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			channelPeer, err := invoke.ResolvePeer(ctx, c, args[0])
+			if err != nil {
+				return fmt.Errorf("resolve channel: %w", err)
+			}
+			botPeer, err := invoke.ResolvePeer(ctx, c, args[1])
+			if err != nil {
+				return fmt.Errorf("resolve bot: %w", err)
+			}
+
+			ch, ok := channelPeer.(*tg.InputPeerChannel)
+			if !ok {
+				return fmt.Errorf("promote-bot requires a channel/supergroup peer, got %T", channelPeer)
+			}
+
+			botUser := peerToInputUser(botPeer)
+			rpc := c.Raw()
+			_, err = rpc.ChannelsEditAdmin(ctx, &tg.ChannelsEditAdminRequest{
+				Channel: &tg.InputChannel{ChannelID: ch.ChannelID, AccessHash: ch.AccessHash},
+				UserID:  botUser,
+				AdminRights: &tg.ChatAdminRights{
+					ChangeInfo:     true,
+					PostMessages:   true,
+					EditMessages:   true,
+					DeleteMessages: true,
+					BanUsers:       true,
+					InviteUsers:    true,
+					PinMessages:    true,
+					ManageTopics:   true,
+				},
+				Rank: "admin",
+			})
+			if err != nil {
+				return fmt.Errorf("promote bot: %w", err)
+			}
+			fmt.Println("Bot promoted to admin")
 			return nil
 		},
 	}
