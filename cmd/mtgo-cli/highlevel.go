@@ -88,19 +88,18 @@ func newSendMessageCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve peer %q: %w", args[0], err)
 			}
-			peerJSON := peerToJSON(peer)
-			randomID := fmt.Sprintf("%d", time.Now().UnixNano())
-			msgJSON, _ := json.Marshal(args[1])
-			params := []byte(fmt.Sprintf(`{"peer": %s, "message": %s, "random_id": %s}`, peerJSON, string(msgJSON), randomID))
-			result, err := invoke.InvokeFull(ctx, c, "messages.sendMessage", params)
+			randomID := time.Now().UnixNano()
+			rpc := c.Raw()
+			result, err := rpc.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+				Peer:     peer,
+				Message:  args[1],
+				RandomID: randomID,
+			})
 			if err != nil {
-				return err
-			}
-			if result.Error != "" {
-				return fmt.Errorf("RPC error: %s", result.Error)
+				return fmt.Errorf("send message: %w", err)
 			}
 			if cfg.Format == "json" {
-				prettyPrint(cfg.Format, result.Data)
+				prettyPrint(cfg.Format, result)
 			} else {
 				fmt.Println("Message sent")
 			}
@@ -130,15 +129,15 @@ func newGetUserCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve peer: %w", err)
 			}
-			params := userToJSON(peer)
-			result, err := invoke.InvokeFull(ctx, c, "users.getFullUser", []byte(fmt.Sprintf(`{"id": %s}`, params)))
+			inputUser := peerToInputUser(peer)
+			rpc := c.Raw()
+			result, err := rpc.UsersGetFullUser(ctx, &tg.UsersGetFullUserRequest{
+				ID: inputUser,
+			})
 			if err != nil {
-				return err
+				return fmt.Errorf("get user: %w", err)
 			}
-			if result.Error != "" {
-				return fmt.Errorf("RPC error: %s", result.Error)
-			}
-			prettyPrint(cfg.Format, result.Data)
+			prettyPrint(cfg.Format, result)
 			return nil
 		},
 	}
@@ -329,6 +328,17 @@ func userToJSON(peer tg.InputPeerClass) string {
 		return fmt.Sprintf(`{"_":"inputUser","user_id":%d,"access_hash":%d}`, p.UserID, p.AccessHash)
 	default:
 		return `{"_":"inputUserSelf"}`
+	}
+}
+
+func peerToInputUser(peer tg.InputPeerClass) tg.InputUserClass {
+	switch p := peer.(type) {
+	case *tg.InputPeerSelf:
+		return &tg.InputUserSelf{}
+	case *tg.InputPeerUser:
+		return &tg.InputUser{UserID: p.UserID, AccessHash: p.AccessHash}
+	default:
+		return &tg.InputUserSelf{}
 	}
 }
 
