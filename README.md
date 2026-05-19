@@ -6,13 +6,9 @@ Telegram MTProto debug and invoke CLI built on [mtgo](https://github.com/mtgo-la
 
 ```bash
 go install github.com/mtgo-labs/mtgo-cli/cmd/mtgo-cli@latest
-```
 
-This installs the `mtgo-cli` binary into your Go binary directory. Make sure it
-is on your `PATH`:
-
-```bash
-export PATH="$PATH:$(go env GOPATH)/bin"
+# Install the Agent Skill for Claude Code, Codex, Cursor, etc.
+npx skills add mtgo-labs/mtgo-cli
 ```
 
 ## Quick Start
