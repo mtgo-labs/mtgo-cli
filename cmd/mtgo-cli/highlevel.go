@@ -250,15 +250,21 @@ func newListMessagesCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve peer: %w", err)
 			}
-			peerJSON := peerToJSON(peer)
-			result, err := invoke.InvokeFull(ctx, c, "messages.getHistory", []byte(fmt.Sprintf(`{"peer": %s, "limit": %d}`, peerJSON, limit)))
+			rpc := c.Raw()
+			result, err := rpc.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+				Peer:      peer,
+				Limit:     int32(limit),
+				OffsetID:  0,
+				OffsetDate: 0,
+				AddOffset: 0,
+				MaxID:     0,
+				MinID:     0,
+				Hash:      0,
+			})
 			if err != nil {
-				return err
+				return fmt.Errorf("get history: %w", err)
 			}
-			if result.Error != "" {
-				return fmt.Errorf("RPC error: %s", result.Error)
-			}
-			prettyPrint(cfg.Format, result.Data)
+			prettyPrint(cfg.Format, result)
 			return nil
 		},
 	}

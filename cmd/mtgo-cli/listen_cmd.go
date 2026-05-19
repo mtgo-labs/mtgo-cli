@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -28,7 +29,7 @@ func (h *invokeHandler) HandleInvoke(payload ipc.InvokePayload) (*ipc.Response, 
 	if result.Error != "" {
 		return &ipc.Response{OK: false, Error: result.Error, DurMs: result.Duration.Milliseconds()}, nil
 	}
-	return &ipc.Response{OK: true, Data: result.Data, DurMs: result.Duration.Milliseconds()}, nil
+	return &ipc.Response{OK: true, Data: json.RawMessage(result.RawJSON), DurMs: result.Duration.Milliseconds()}, nil
 }
 
 func (h *invokeHandler) HandleStatus() *ipc.Response {

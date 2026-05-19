@@ -14,6 +14,7 @@ type Result struct {
 	Method   string        `json:"method"`
 	Data     interface{}   `json:"data,omitempty"`
 	RawBytes []byte        `json:"raw_bytes,omitempty"`
+	RawJSON  json.RawMessage `json:"-"`
 	Duration time.Duration `json:"duration_ms"`
 	Error    string        `json:"error,omitempty"`
 }
@@ -39,12 +40,7 @@ func InvokeFull(ctx context.Context, client *telegram.Client, method string, jso
 		return result, nil
 	}
 
-	var data interface{}
-	if err := json.Unmarshal(resp, &data); err != nil {
-		result.Error = fmt.Sprintf("unmarshal response: %v", err)
-		return result, nil
-	}
-	result.Data = data
+	result.RawJSON = resp
 	return result, nil
 }
 
