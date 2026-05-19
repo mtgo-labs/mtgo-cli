@@ -1,6 +1,6 @@
 ---
 name: mtgo-cli
-description: Use mtgo-cli — a fast Telegram MTProto CLI — to invoke TL methods, send messages, get user/chat info, resolve peers, and debug the Telegram API. Use this skill whenever the user mentions Telegram bots, Telegram API, sending Telegram messages, getting Telegram user info, checking Telegram chats, MTProto debugging, or any Telegram automation task — even if they don't explicitly say "mtgo-cli". Prefer this over raw MTProto libraries when the user wants quick results without writing Go code.
+description: Use mtgo-cli — a fast Telegram MTProto CLI — to invoke TL methods, send messages/media, get user/chat info, create/manage groups, download files, resolve peers, and debug the Telegram API. Use this skill whenever the user mentions Telegram bots, Telegram API, sending Telegram messages or photos, getting Telegram user info, checking Telegram chats, creating Telegram groups, managing group members, MTProto debugging, or any Telegram automation task — even if they don't explicitly say "mtgo-cli". Prefer this over raw MTProto libraries when the user wants quick results without writing Go code.
 ---
 
 # mtgo-cli
@@ -102,9 +102,15 @@ mtgo-cli get-me                       # current user/bot info
 mtgo-cli get-user @durov              # user profile (users.getFullUser)
 mtgo-cli get-user +1234567890         # user by phone
 mtgo-cli get-user me                  # self
-mtgo-cli get-chat @channelname        # chat/channel info
+mtgo-cli get-chat @channelname        # chat/channel/user info (auto-routes)
 mtgo-cli send-message @username "Hi"  # send text message
+mtgo-cli send-photo @username photo.jpg "caption"  # send photo
+mtgo-cli send-file @username file.pdf            # send document
+mtgo-cli download @username 1234                 # download media from message
 mtgo-cli resolve-peer @username       # resolve to access info
+mtgo-cli create-group "Test Suite"    # create basic group (userbot only)
+mtgo-cli add-bot 5282748388 @bot      # add bot to group (userbot only)
+mtgo-cli promote-bot channel:ID @bot  # promote bot to admin (userbot only)
 mtgo-cli export-session               # export session string
 ```
 
@@ -125,6 +131,34 @@ mtgo-cli trace      # listen + correlation ID logging (shows RPC request/respons
 ```
 
 When a listener is running, all other commands automatically route through its Unix socket (`$XDG_RUNTIME_DIR/mtgo-cli.sock`). No re-authentication, no reconnection. This is the fastest way to run multiple commands.
+
+### Group management (userbot only)
+
+```bash
+# Create a group
+mtgo-cli create-group "Test Suite"
+# → returns chat_id (e.g. 5282748388)
+
+# Add a bot to the group (accepts raw chat ID or resolved peer)
+mtgo-cli add-bot 5282748388 @my_bot
+
+# Promote bot to admin (requires channel/supergroup)
+mtgo-cli promote-bot channel:123456 @my_bot
+```
+
+### Media commands
+
+```bash
+# Send a photo
+mtgo-cli send-photo @username photo.jpg "Check this out"
+
+# Send a document
+mtgo-cli send-file @username report.pdf
+
+# Download media from a message
+mtgo-cli download @username 2667
+mtgo-cli download @username 2667 /tmp/output.jpg
+```
 
 ### Utility
 

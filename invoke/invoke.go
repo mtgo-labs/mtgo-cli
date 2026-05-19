@@ -65,7 +65,7 @@ func InvokeFast(ctx context.Context, client *telegram.Client, method string, jso
 		}
 	}
 
-	raw, err := client.InvokeWithRawByte(ctx, req)
+	raw, err := client.InvokeWithRawResult(ctx, req)
 	elapsed := time.Since(start)
 
 	result := &Result{
