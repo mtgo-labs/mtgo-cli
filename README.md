@@ -1,6 +1,14 @@
+<div align="center">
+
 # mtgo-cli
 
 Telegram MTProto debug and invoke CLI built on [mtgo](https://github.com/mtgo-labs/mtgo) — with higher accuracy and performance.
+
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mtgo-labs/mtgo-cli.svg)](https://pkg.go.dev/github.com/mtgo-labs/mtgo-cli)
+[![skills.sh](https://skills.sh/b/mtgo-labs/mtgo-cli)](https://skills.sh/mtgo-labs/mtgo-cli)
+
+</div>
 
 ## Install
 
