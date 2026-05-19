@@ -116,4 +116,4 @@ internal/
 
 ## License
 
-MIT
+[Apache License 2.0](LICENSE) — Copyright 2026 mtgo-labs
