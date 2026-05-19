@@ -212,15 +212,18 @@ func newListChatsCmd() *cobra.Command {
 			defer c.Stop()
 
 			ctx := context.Background()
-			params := fmt.Sprintf(`{"offset_date": 0, "offset_id": 0, "offset_peer": {"_":"inputPeerEmpty"}, "limit": %d, "hash": 0}`, limit)
-			result, err := invoke.InvokeFull(ctx, c, "messages.getDialogs", []byte(params))
+			rpc := c.Raw()
+			result, err := rpc.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
+				OffsetDate: 0,
+				OffsetID:   0,
+				OffsetPeer: &tg.InputPeerEmpty{},
+				Limit:      int32(limit),
+				Hash:       0,
+			})
 			if err != nil {
-				return err
+				return fmt.Errorf("get dialogs: %w", err)
 			}
-			if result.Error != "" {
-				return fmt.Errorf("RPC error: %s", result.Error)
-			}
-			prettyPrint(cfg.Format, result.Data)
+			prettyPrint(cfg.Format, result)
 			return nil
 		},
 	}
@@ -270,6 +273,40 @@ func newListMessagesCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&limit, "limit", 20, "Number of messages to fetch")
 	return cmd
+}
+
+func newCreateGroupCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "create-group <title>",
+		Short: "Create a basic group (userbot only)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(cmd)
+			if err != nil {
+				return err
+			}
+			c, err := connectOrIPC(cfg, false)
+			if err != nil {
+				return err
+			}
+			defer c.Stop()
+
+			ctx := context.Background()
+			rpc := c.Raw()
+
+			result, err := rpc.MessagesCreateChat(ctx, &tg.MessagesCreateChatRequest{
+				Users: []tg.InputUserClass{&tg.InputUserEmpty{}},
+				Title: args[0],
+			})
+			if err != nil {
+				return fmt.Errorf("create chat: %w", err)
+			}
+
+			fmt.Printf("Group %q created\n", args[0])
+			prettyPrint(cfg.Format, result)
+			return nil
+		},
+	}
 }
 
 func newResolvePeerCmd() *cobra.Command {
