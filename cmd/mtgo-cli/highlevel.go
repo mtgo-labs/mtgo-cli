@@ -146,7 +146,7 @@ func newGetUserCmd() *cobra.Command {
 func newGetChatCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get-chat <peer>",
-		Short: "Get chat info",
+		Short: "Get chat/channel/user info",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(cmd)
@@ -164,15 +164,32 @@ func newGetChatCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve peer: %w", err)
 			}
-			chatID := extractChatID(peer)
-			result, err := invoke.InvokeFull(ctx, c, "messages.getFullChat", []byte(fmt.Sprintf(`{"chat_id": %d}`, chatID)))
+			rpc := c.Raw()
+			var result interface{}
+			switch p := peer.(type) {
+			case *tg.InputPeerUser:
+				result, err = rpc.UsersGetFullUser(ctx, &tg.UsersGetFullUserRequest{
+					ID: &tg.InputUser{UserID: p.UserID, AccessHash: p.AccessHash},
+				})
+			case *tg.InputPeerSelf:
+				result, err = rpc.UsersGetFullUser(ctx, &tg.UsersGetFullUserRequest{
+					ID: &tg.InputUserSelf{},
+				})
+			case *tg.InputPeerChat:
+				result, err = rpc.MessagesGetFullChat(ctx, &tg.MessagesGetFullChatRequest{
+					ChatID: p.ChatID,
+				})
+			case *tg.InputPeerChannel:
+				result, err = rpc.ChannelsGetFullChannel(ctx, &tg.ChannelsGetFullChannelRequest{
+					Channel: &tg.InputChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash},
+				})
+			default:
+				return fmt.Errorf("unsupported peer type: %T", peer)
+			}
 			if err != nil {
-				return err
+				return fmt.Errorf("get info: %w", err)
 			}
-			if result.Error != "" {
-				return fmt.Errorf("RPC error: %s", result.Error)
-			}
-			prettyPrint(cfg.Format, result.Data)
+			prettyPrint(cfg.Format, result)
 			return nil
 		},
 	}
