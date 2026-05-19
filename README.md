@@ -13,24 +13,40 @@ npx skills add mtgo-labs/mtgo-cli
 
 ## Quick Start
 
+### Bot
+
 ```bash
-# Set credentials
 export MTGO_CLI_API_ID=12345
 export MTGO_CLI_API_HASH=your_hash
+export MTGO_CLI_BOT_TOKEN=123:ABC
 
-# Get current user/bot info
-mtgo-cli get-me --bot-token YOUR_BOT_TOKEN
-
-# Start a persistent listener
-mtgo-cli listen --bot-token YOUR_BOT_TOKEN
-
-# In another terminal — invoke through the listener (fast, no reconnect)
-mtgo-cli invoke messages.sendMessage '{"peer":{"_":"inputPeerUser","user_id":123,"access_hash":456},"message":"hello"}'
-
-# High-level commands
+mtgo-cli get-me --format json
 mtgo-cli send-message @username "Hello!"
-mtgo-cli get-user @username
-mtgo-cli resolve-peer +1234567890
+```
+
+### Userbot
+
+```bash
+export MTGO_CLI_API_ID=12345
+export MTGO_CLI_API_HASH=your_hash
+export MTGO_CLI_SESSION="your_pyrogram_session_string"
+
+mtgo-cli get-me
+mtgo-cli create-group "Test Suite"
+mtgo-cli add-bot 5282748388 @my_bot
+mtgo-cli send-photo @username photo.jpg "Check this out"
+mtgo-cli download @username 2667
+```
+
+### High-performance listener
+
+```bash
+# Terminal 1 — start once
+mtgo-cli listen &
+
+# Terminal 2+ — all commands route through IPC, zero reconnect
+mtgo-cli get-me
+mtgo-cli invoke messages.getHistory '{"peer":{"_":"inputPeerSelf"},"limit":10}'
 ```
 
 ## Commands
