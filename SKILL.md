@@ -1,6 +1,6 @@
 ---
 name: mtgo-cli
-description: Use mtgo-cli — a fast Telegram MTProto CLI — to invoke TL methods, send messages/media, get user/chat info, create/manage groups, download files, resolve peers, and debug the Telegram API. Use this skill whenever the user mentions Telegram bots, Telegram API, sending Telegram messages or photos, getting Telegram user info, checking Telegram chats, creating Telegram groups, managing group members, MTProto debugging, or any Telegram automation task — even if they don't explicitly say "mtgo-cli". Prefer this over raw MTProto libraries when the user wants quick results without writing Go code.
+description: Use mtgo-cli — a fast Telegram MTProto CLI — to invoke any TL method, send messages and media, get user/chat info, create and manage groups, download files, resolve peers, and debug the Telegram API from the terminal. Use for quick Telegram automation without writing Go code: sending messages or photos, checking chats, creating groups, managing members, exporting sessions, tracing RPC calls, or exploring the TL schema. Triggers on "mtgo-cli", "Telegram CLI", "Telegram API from terminal", "send Telegram message command line", "MTProto debug", and any request to interact with Telegram via CLI. Prefer over raw MTProto libraries when the user wants immediate results without writing code. Covers bot and userbot auth (bot token, phone, QR, session strings from Telethon/Pyrogram), IPC listener for fast repeated commands, dual-path invoke engine with JSON and fast modes, and smart peer resolution (@username, phone, me, IDs).
 ---
 
 # mtgo-cli
@@ -12,7 +12,8 @@ mtgo-cli is a CLI tool for calling the Telegram MTProto API directly from the te
 **Binary:** `mtgo-cli` (or `go run ./cmd/mtgo-cli/` from the repo)
 **Repo:** `github.com/mtgo-labs/mtgo-cli`
 **Env vars:** `MTGO_CLI_API_ID`, `MTGO_CLI_API_HASH`, `MTGO_CLI_BOT_TOKEN`, `MTGO_CLI_SESSION`, `MTGO_CLI_PHONE`
-**Config file:** `~/.mtgo-cli.json` (JSON with `api_id`, `api_hash`, `bot_token`, etc.)
+**Config file:** `~/.mtgo-cli.json` (JSON with `api_id`, `api_hash`, `bot_token`, `session`, `phone`, `socket_path`, `store_path`)
+**Session store:** `~/.mtgo-cli-session.json` (persistent JSON session, enable with `--store`)
 **Related skill:** For mtgo library APIs, client patterns, and raw TL usage, install the mtgo skill with `npx skills add https://github.com/mtgo-labs/mtgo`.
 
 ## Authentication
@@ -26,6 +27,14 @@ export MTGO_CLI_BOT_TOKEN=123:ABC   # or MTGO_CLI_SESSION or MTGO_CLI_PHONE
 ```
 
 The priority order is: env vars > CLI flags > config file. Choose ONE auth method — bot token, phone, or session string. If you have a session string from Telethon/Pyrogram/GramJS/mtcute, use `MTGO_CLI_SESSION` — it auto-detects the format.
+
+For file-based secrets, prefer the `-file` variants to avoid leaking values in shell history:
+
+```bash
+mtgo-cli --api-id 12345 --api-hash-file ~/.secrets/api_hash --session-file ~/.secrets/session get-me
+```
+
+File-based flags (`--api-hash-file`, `--session-file`, `--bot-token-file`) require the file to have mode `0600` or stricter. Env vars are unset after reading to prevent child process inheritance.
 
 ### Userbot testing and BotFather setup
 
@@ -73,6 +82,9 @@ mtgo-cli invoke messages.getHistory '{"peer":{"_":"inputPeerSelf"},"limit":5,"of
 
 # Fast path — skip TL decode for bulk operations
 mtgo-cli invoke help.getConfig --fast
+
+# Limit hex dump size for fast path (default 256 bytes, 0 = unlimited)
+mtgo-cli invoke messages.getMessages --fast --max-bytes 0
 
 # Pretty JSON output
 mtgo-cli invoke users.getFullUser '{"id":{"_":"inputUserSelf"}}' --format json
@@ -179,7 +191,9 @@ These formats work everywhere a peer is needed:
 | Phone | `+1234567890` | Contact lookup |
 | `me` / `self` | `me` | Current user |
 | Numeric ID | `123456789` | Auto-detected as user/chat |
-| Explicit | `channel:1234` | Forced channel type |
+| Explicit channel | `channel:1234` | Forced channel type |
+| Explicit chat | `chat:1234` | Forced basic group type |
+| Explicit user | `user:1234` | Forced user type |
 
 ## JSON Constructor Format
 
@@ -233,22 +247,60 @@ mtgo-cli invoke messages.getHistory '{"peer":{"_":"inputPeerSelf"},"limit":1,"of
 
 ### Export a session for reuse
 ```bash
-mtgo-cli export-session > my_session.txt
+# To stdout (warning printed to stderr about security)
+mtgo-cli export-session
+
+# To file (mode 0600)
+mtgo-cli export-session --output ~/.secrets/my_session.txt
+
 # Later:
-MTGO_CLI_SESSION=$(cat my_session.txt) mtgo-cli get-me
+MTGO_CLI_SESSION=$(cat ~/.secrets/my_session.txt) mtgo-cli get-me
 ```
 
 ## Output Format
 
 Use `--format json` for programmatic output. Default is colored text. Use `--no-color` to disable ANSI codes. The `--debug` flag logs full request/response payloads to stderr (contains sensitive data — don't use in shared terminals).
 
+## Global Flags
+
+| Flag | Type | Description |
+|---|---|---|
+| `--api-id` | int32 | Telegram API ID |
+| `--api-hash` | string | API hash (prefer `--api-hash-file`) |
+| `--api-hash-file` | string | Read API hash from file (mode 0600 required) |
+| `--session` | string | Session string (prefer `--session-file`) |
+| `--session-file` | string | Read session from file (mode 0600 required) |
+| `--bot-token` | string | Bot token (prefer `--bot-token-file`) |
+| `--bot-token-file` | string | Read bot token from file (mode 0600 required) |
+| `--phone` | string | Phone number for user login |
+| `--store` | string | JSON session store path (e.g. `~/.mtgo-cli-session.json`) |
+| `--socket` | string | Override IPC socket path |
+| `--config` | string | Config file path (default `~/.mtgo-cli.json`) |
+| `--no-color` | bool | Disable colored output |
+| `--debug` | bool | Verbose debug output to stderr |
+| `--format` | string | Output format: `text` (default) or `json` |
+
 ## Security
 
-- Never pass credentials via CLI flags — they appear in `ps aux`. Always use `MTGO_CLI_*` environment variables or the config file.
-- The config file (`~/.mtgo-cli.json`) is auto-restricted to mode `0600`.
-- The IPC socket is mode `0600` (owner-only).
+- Never pass credentials via CLI flags — they appear in `ps aux`. Always use `MTGO_CLI_*` environment variables, file-based flags, or the config file.
+- The config file (`~/.mtgo-cli.json`) warns if mode > `0600`. File-based flags reject files with mode > `0600`.
+- The IPC socket is mode `0600` and only accepts same-UID connections (SO_PEERCRED check). Symlinks are rejected.
 - Session strings grant full account access — treat them like passwords.
 - `--debug` logs full payloads including session tokens to stderr.
+- Env vars are unset after reading to prevent child process inheritance.
+- The IPC server blocks dangerous methods: `auth.logOut`, `auth.resetAuthorizations`, `account.deleteAccount`, `account.setPrivacy`, `account.resetPassword`.
+- `trace` redacts params/results for sensitive methods (`auth.*`, `account.*Password*`, `messages.requestWebView`, `messages.prolongWebView`) as `[REDACTED]`.
+
+### IPC Limits
+
+| Limit | Value |
+|---|---|
+| Max concurrent connections | 64 |
+| Max request size | 10 MB |
+| Read deadline | 30 seconds |
+| Socket path | `$XDG_RUNTIME_DIR/mtgo-cli.sock` (fallback: `~/.local/run/`, then `/tmp/`) |
+| Peer validation | Same UID only (SO_PEERCRED) |
+| Symlink protection | Socket path and config files reject symlinks |
 
 ## Performance Tips
 
