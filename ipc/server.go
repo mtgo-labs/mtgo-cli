@@ -24,10 +24,10 @@ type Request struct {
 }
 
 type Response struct {
-	OK    bool        `json:"ok"`
-	Data  interface{} `json:"data,omitempty"`
-	Error string      `json:"error,omitempty"`
-	DurMs int64       `json:"duration_ms,omitempty"`
+	OK    bool   `json:"ok"`
+	Data  any    `json:"data,omitempty"`
+	Error string `json:"error,omitempty"`
+	DurMs int64  `json:"duration_ms,omitempty"`
 }
 
 type InvokePayload struct {

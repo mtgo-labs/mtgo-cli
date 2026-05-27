@@ -11,12 +11,12 @@ import (
 )
 
 type Result struct {
-	Method   string        `json:"method"`
-	Data     interface{}   `json:"data,omitempty"`
-	RawBytes []byte        `json:"raw_bytes,omitempty"`
+	Method   string          `json:"method"`
+	Data     any             `json:"data,omitempty"`
+	RawBytes []byte          `json:"raw_bytes,omitempty"`
 	RawJSON  json.RawMessage `json:"-"`
-	Duration time.Duration `json:"duration_ms"`
-	Error    string        `json:"error,omitempty"`
+	Duration time.Duration   `json:"duration_ms"`
+	Error    string          `json:"error,omitempty"`
 }
 
 // InvokeFull calls a TL method by name with JSON params via the full typed path
