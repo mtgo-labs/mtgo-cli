@@ -100,13 +100,13 @@ Otherwise it creates a standalone connection.`,
 	return cmd
 }
 
-func formatOutput(w io.Writer, format string, data interface{}) error {
+func formatOutput(w io.Writer, format string, data any) error {
 	if data == nil {
 		return nil
 	}
 	out, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal output: %w", err)
 	}
 	fmt.Fprintln(w, string(out))
 	return nil
@@ -137,7 +137,11 @@ func formatInvokeResult(w io.Writer, errW io.Writer, format string, result *invo
 		return
 	}
 	if result.Data != nil {
-		out, _ := json.MarshalIndent(result.Data, "", "  ")
+		out, err := json.MarshalIndent(result.Data, "", "  ")
+		if err != nil {
+			fmt.Fprintf(errW, "Error: marshal result: %v\n", err)
+			return
+		}
 		fmt.Fprintln(w, string(out))
 		return
 	}

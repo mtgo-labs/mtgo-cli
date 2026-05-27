@@ -26,7 +26,10 @@ func newMethodsCmd() *cobra.Command {
 			methods := invoke.FilterMethods(prefix)
 
 			if cfg != nil && cfg.Format == "json" {
-				out, _ := json.MarshalIndent(methods, "", "  ")
+				out, err := json.MarshalIndent(methods, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshal methods: %w", err)
+				}
 				fmt.Fprintln(w, string(out))
 				return nil
 			}

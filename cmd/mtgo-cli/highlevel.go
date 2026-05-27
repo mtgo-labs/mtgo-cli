@@ -169,7 +169,7 @@ func newGetChatCmd() *cobra.Command {
 				return fmt.Errorf("resolve peer: %w", err)
 			}
 			rpc := c.Raw()
-			var result interface{}
+			var result any
 			switch p := peer.(type) {
 			case *tg.InputPeerUser:
 				result, err = rpc.UsersGetFullUser(ctx, &tg.UsersGetFullUserRequest{
@@ -732,11 +732,20 @@ func extractChatID(peer tg.InputPeerClass) int64 {
 	}
 }
 
-func prettyPrint(w io.Writer, format string, data interface{}) {
+func prettyPrint(w io.Writer, format string, data any) {
 	if format == "json" {
-		out, _ := json.MarshalIndent(data, "", "  ")
+		out, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			fmt.Fprintf(w, "error: marshal: %v\n", err)
+			return
+		}
 		fmt.Fprintln(w, string(out))
 		return
 	}
-	fmt.Fprintf(w, "%+v\n", data)
+	out, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		fmt.Fprintf(w, "%+v\n", data)
+		return
+	}
+	fmt.Fprintln(w, string(out))
 }
