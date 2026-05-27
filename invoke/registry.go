@@ -32,7 +32,7 @@ func FilterMethods(prefix string) []string {
 	if prefix == "" {
 		return all
 	}
-	var result []string
+	result := make([]string, 0, len(all))
 	for _, m := range all {
 		if strings.HasPrefix(m, prefix) {
 			result = append(result, m)
