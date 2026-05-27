@@ -96,5 +96,9 @@ func (t *Tracer) UpdateHandler() func(ctx *telegram.Context) {
 }
 
 func tgName(obj tg.TLObject) string {
-	return fmt.Sprintf("%T", obj)
+	name := fmt.Sprintf("%T", obj)
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		return name[i+1:]
+	}
+	return name
 }
