@@ -34,7 +34,9 @@ func DefaultSocketPath() string {
 		return filepath.Join(os.TempDir(), "mtgo-cli.sock")
 	}
 	dir := filepath.Join(home, ".local", "run")
-	os.MkdirAll(dir, 0700)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return filepath.Join(os.TempDir(), "mtgo-cli.sock")
+	}
 	return filepath.Join(dir, "mtgo-cli.sock")
 }
 
@@ -153,23 +155,18 @@ func checkFilePerms(path string) error {
 func (c *Config) overrideFromEnv() {
 	if v := os.Getenv("MTGO_CLI_API_ID"); v != "" {
 		fmt.Sscanf(v, "%d", &c.APIID)
-		os.Unsetenv("MTGO_CLI_API_ID")
 	}
 	if v := os.Getenv("MTGO_CLI_API_HASH"); v != "" {
 		c.APIHash = v
-		os.Unsetenv("MTGO_CLI_API_HASH")
 	}
 	if v := os.Getenv("MTGO_CLI_BOT_TOKEN"); v != "" {
 		c.BotToken = v
-		os.Unsetenv("MTGO_CLI_BOT_TOKEN")
 	}
 	if v := os.Getenv("MTGO_CLI_SESSION"); v != "" {
 		c.Session = v
-		os.Unsetenv("MTGO_CLI_SESSION")
 	}
 	if v := os.Getenv("MTGO_CLI_PHONE"); v != "" {
 		c.Phone = v
-		os.Unsetenv("MTGO_CLI_PHONE")
 	}
 }
 
