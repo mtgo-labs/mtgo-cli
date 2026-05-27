@@ -39,14 +39,9 @@ func TestDefaultSocketPath(t *testing.T) {
 }
 
 func TestLoadFromEnv(t *testing.T) {
-	os.Setenv("MTGO_CLI_API_ID", "123")
-	os.Setenv("MTGO_CLI_API_HASH", "testhash")
-	os.Setenv("MTGO_CLI_BOT_TOKEN", "testtoken")
-	defer func() {
-		os.Unsetenv("MTGO_CLI_API_ID")
-		os.Unsetenv("MTGO_CLI_API_HASH")
-		os.Unsetenv("MTGO_CLI_BOT_TOKEN")
-	}()
+	t.Setenv("MTGO_CLI_API_ID", "123")
+	t.Setenv("MTGO_CLI_API_HASH", "testhash")
+	t.Setenv("MTGO_CLI_BOT_TOKEN", "testtoken")
 
 	cmd := &cobra.Command{}
 	cmd.Flags().String("config", "", "")
