@@ -1,4 +1,4 @@
-.PHONY: build install test lint clean
+.PHONY: build install test lint fmt clean
 
 BINARY = mtgo-cli
 LDFLAGS = -X main.version=$(shell git describe --tags --always 2>/dev/null || echo "dev") \
@@ -15,7 +15,10 @@ test:
 	go test ./...
 
 lint:
-	go vet ./...
+	golangci-lint run ./...
+
+fmt:
+	golangci-lint fmt ./...
 
 clean:
 	rm -f $(BINARY)
