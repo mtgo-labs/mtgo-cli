@@ -12,8 +12,7 @@ mtgo-cli is a CLI tool for calling the Telegram MTProto API directly from the te
 **Binary:** `mtgo-cli` (or `go run ./cmd/mtgo-cli/` from the repo)
 **Repo:** `github.com/mtgo-labs/mtgo-cli`
 **Env vars:** `MTGO_CLI_API_ID`, `MTGO_CLI_API_HASH`, `MTGO_CLI_BOT_TOKEN`, `MTGO_CLI_SESSION`, `MTGO_CLI_PHONE`
-**Config file:** `~/.mtgo-cli.json` (JSON with `api_id`, `api_hash`, `bot_token`, `session`, `phone`, `socket_path`, `store_path`)
-**Session store:** `~/.mtgo-cli-session.json` (persistent JSON session, enable with `--store`)
+**Config file:** `~/.mtgo-cli.json` (JSON with `api_id`, `api_hash`, `bot_token`, `session`, `phone`, `socket_path`)
 **Related skill:** For mtgo library APIs, client patterns, and raw TL usage, install the mtgo skill with `npx skills add https://github.com/mtgo-labs/mtgo`.
 
 ## Authentication
@@ -273,7 +272,6 @@ Use `--format json` for programmatic output. Default is colored text. Use `--no-
 | `--bot-token` | string | Bot token (prefer `--bot-token-file`) |
 | `--bot-token-file` | string | Read bot token from file (mode 0600 required) |
 | `--phone` | string | Phone number for user login |
-| `--store` | string | JSON session store path (e.g. `~/.mtgo-cli-session.json`) |
 | `--socket` | string | Override IPC socket path |
 | `--config` | string | Config file path (default `~/.mtgo-cli.json`) |
 | `--no-color` | bool | Disable colored output |
