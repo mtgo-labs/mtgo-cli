@@ -3,7 +3,7 @@ module github.com/mtgo-labs/mtgo-cli
 go 1.26.2
 
 require (
-	github.com/mtgo-labs/mtgo v0.14.0
+	github.com/mtgo-labs/mtgo v0.14.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.47.0
 )
