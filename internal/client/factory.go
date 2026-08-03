@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/mtgo-labs/mtgo/telegram"
-	tgconv "github.com/mtgo-labs/session-converter"
 )
 
 type ClientConfig struct {
@@ -35,11 +34,7 @@ func New(cfg *ClientConfig) (*telegram.Client, error) {
 
 	switch {
 	case cfg.Session != "":
-		str, err := tgconv.Convert(cfg.Session, tgconv.FormatTelethon)
-		if err != nil {
-			return nil, fmt.Errorf("client: invalid session string: %w", err)
-		}
-		telegramCfg.SessionString = str
+		telegramCfg.SessionString = cfg.Session
 
 	case cfg.BotToken != "":
 		telegramCfg.BotToken = cfg.BotToken
